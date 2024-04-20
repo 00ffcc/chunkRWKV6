@@ -6,10 +6,10 @@ from einops import rearrange, reduce, repeat
 dir_path = os.path.dirname(os.path.abspath(__file__))
 HEAD_SIZE=64 # 每个head的大小
 if torch.version.cuda is not None:
-    rwkv6 = load(name="rwkv6", sources=[f"{dir_path}/cuda/rwkv6_op.cpp", f"{dir_path}/cuda/rwkv6.cu"], # cuda
+    rwkv6 = load(name="rwkv6", sources=[f"{dir_path}/cuda/rwkv6_op.cpp", f"{dir_path}/cuda/rwkv6.cu", f"{dir_path}/cuda/inter.cu"], # cuda
                 verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3",  "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={4096}"]) 
 elif torch.version.hip is not None:
-    rwkv6=load(name="rwkv6", sources=[f"{dir_path}/cuda/rwkv6_op.cpp", f"{dir_path}cuda/rwkv6.cu"], # rocm
+    rwkv6 = load(name="rwkv6", sources=[f"{dir_path}/cuda/rwkv6_op.cpp", f"{dir_path}/cuda/rwkv6.cu", f"{dir_path}/cuda/inter.cu"], # rocm
                 verbose=True, extra_cuda_cflags=["-O3", f"-D_N_={HEAD_SIZE}", f"-D_T_={4096}"])
 else:
     raise NotImplementedError("Only support CUDA and ROCm")
@@ -86,20 +86,26 @@ class chunkRWKV6(torch.autograd.Function):
             r = rearrange(r, 'b nc cs (h hs) -> b nc cs h hs', h=H, hs=HEAD_SIZE)
 
             for j in range(1, nc): # TODO 优化
-                for t in range(chunk_size):
-                    if t == 0:
-                        y[:, j, t, :, :] += torch.einsum('b h j, b h i j -> b h i', 
-                                                            r[:, j, t, :, :], 
-                                                            state[:, j-1, :, :, :])                        
-                    else:
-                        y[:, j, t, :, :] += torch.einsum('b h j, b h i j, b h j -> b h i', 
-                                                            r[:, j, t, :, :], 
-                                                            state[:, j-1, :, :, :],
-                                                            torch.exp(w_orig[:, j, t-1, :, :]))
+                # for t in range(chunk_size):
+                #     if t == 0:
+                #         y[:, j, t, :, :] += torch.einsum('b h j, b h i j -> b h i', 
+                #                                             r[:, j, t, :, :], 
+                #                                             state[:, j-1, :, :, :])                        
+                #     else:
+                #         y[:, j, t, :, :] += torch.einsum('b h j, b h i j, b h j -> b h i', 
+                #                                             r[:, j, t, :, :], 
+                #                                             state[:, j-1, :, :, :],
+                #                                             torch.exp(w_orig[:, j, t-1, :, :]))
 
                 state[:, j, :, :, :] += torch.einsum('b h i j, b h j -> b h i j', 
                                                         state[:, j-1, :, :, :], 
                                                         torch.exp(w_orig[:, j, -1, :, :]))
+            if r.dtype == torch.bfloat16:
+                rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, r, w, y)
+            elif r.dtype == torch.float16:
+                rwkv6.Inter_fwd_fp16(B, cs, C, H, nc, state, r, w, y)
+            elif r.dtype == torch.float32:
+                rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, r, w, y)
             
             state = state[:, -1, :, :, :] # 取最后一个块的状态
 
@@ -109,7 +115,7 @@ class chunkRWKV6(torch.autograd.Function):
 
             
 if __name__ == '__main__':
-    B, T, H = 2, 256, 4
+    B, T, H = 2, 256, 6
     C = H*HEAD_SIZE
     state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
     r = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
@@ -123,7 +129,8 @@ if __name__ == '__main__':
 
     y2, state2 = chunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u)
 
-    print((y1-y2).abs().max())
+    print(torch.max((y1-y2).abs()))
+    print(y1-y2)
     print((state1-state2).abs().max())
 
 
