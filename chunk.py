@@ -86,17 +86,6 @@ class chunkRWKV6(torch.autograd.Function):
             r = rearrange(r, 'b nc cs (h hs) -> b nc cs h hs', h=H, hs=HEAD_SIZE)
 
             for j in range(1, nc): # TODO 优化
-                # for t in range(chunk_size):
-                #     if t == 0:
-                #         y[:, j, t, :, :] += torch.einsum('b h j, b h i j -> b h i', 
-                #                                             r[:, j, t, :, :], 
-                #                                             state[:, j-1, :, :, :])                        
-                #     else:
-                #         y[:, j, t, :, :] += torch.einsum('b h j, b h i j, b h j -> b h i', 
-                #                                             r[:, j, t, :, :], 
-                #                                             state[:, j-1, :, :, :],
-                #                                             torch.exp(w_orig[:, j, t-1, :, :]))
-
                 state[:, j, :, :, :] += torch.einsum('b h i j, b h j -> b h i j', 
                                                         state[:, j-1, :, :, :], 
                                                         torch.exp(w_orig[:, j, -1, :, :]))
