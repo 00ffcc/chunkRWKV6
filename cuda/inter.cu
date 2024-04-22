@@ -14,7 +14,7 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
     const int ck= blockIdx.y+1;
     const int h = blockIdx.z;
     const int i = threadIdx.x;
-    _state+=b*CK*H*_N_*_N_ + (ck-1)*H*_N_*_N_ + h*_N_*_N_ + i*_N_; // state_ck-1
+    _state+=b*CK*H*_N_*_N_ + (ck-1)*H*_N_*_N_ + h*_N_*_N_ + i*_N_; // state_(ck-1)
     __shared__ float r[_N_], cw[_N_];
 
     __syncthreads();

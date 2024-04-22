@@ -2,6 +2,14 @@
 
 使用分块并行优化RWKV的prefill和训练速度
 
+# benchmark
+
+![](img/1.png)
+
+在3090上测试，batch_size=1, head_num=32, head_size=64, channel=2048, 与RWKV6-1.6b设置相同
+
+
+
 # Todolist
 
 - 优化速度
