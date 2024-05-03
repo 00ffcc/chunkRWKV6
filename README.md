@@ -83,6 +83,6 @@ $$\frac{\partial Loss}{\partial w_{t_1,h,j}}=\frac{\partial Loss}{\partial W_{t_
 
 正好把中间挖掉的一项补上了
 
-$$\frac{\partial Loss}{\partial w_{t_1,h,j}}=(\sum_{t_2=t_1}\sum_{t_3=0}^{t_1-1}(\sum_i \frac{\partial Loss}{\partial Y_{t_2,h,i}}R_{t_2,h,j}V_{t_3,h,i}K_{t_3,h,j}\prod_{t=t_3+1}^{t_2-1}W_{t,h,j})+\sum_{t_2=t_1}\sum_i \frac{\partial Loss}{\partial Y_{t_2,h,i}}R_{t_2,h,j}S_{-1,h,i,j}\prod_{t=0}^{t_2-1}W_{t,h,j})\times (-\exp(W'_{t_1,h,j}))$$
+$$\frac{\partial Loss}{\partial w_{t_1,h,j}}=(\sum_{t_2=t_1}\sum_{t_3=0}^{t_1-1}(\sum_i \frac{\partial Loss}{\partial Y_{t_2,h,i}}R_{t_2,h,j}V_{t_3,h,i}K_{t_3,h,j}\prod_{t=t_3+1}^{t_2-1}W_{t,h,j})+\sum_{t_2=t_1}\sum_i \frac{\partial Loss}{\partial Y_{t_2,h,i}}R_{t_2,h,j}S_{-1,h,i,j}\prod_{t=0}^{t_2-1}W_{t,h,j})\times (-\exp(w_{t_1,h,j}))$$
 
 这样，中间的括号里为 $t_2,t_3$ 的函数，总的减掉 $t_2,t_3$ 在 $t_1$ 同一侧的即可.
