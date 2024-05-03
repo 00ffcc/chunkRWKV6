@@ -45,8 +45,8 @@ class continousChunkRWKV6(torch.autograd.Function):
 
             w = -torch.exp(w)
             w_orig = w.clone()
-            w_orig = rearrange(w_orig, 'b (nc cs) (h hs) -> b nc cs h hs', nc=nc, cs=cs, h=H, hs=HEAD_SIZE)
-            w_orig = w_orig.cumsum(dim=2)
+            w_orig = rearrange(w_orig, 'b t (h hs) -> b t h hs', h=H, hs=HEAD_SIZE)
+            w_orig = w_orig.cumsum(dim=1)
 
             w = torch.exp(w) # time_decay TODO 优化
 
@@ -77,7 +77,8 @@ class continousChunkRWKV6(torch.autograd.Function):
                         lengths[0, j] = torch.sum(seq_idx[0, j, :]==seq_idx[0, j-1, -1], dtype=torch.int32).item()
                         state[state_idx[0, j, 0]] += torch.einsum('h i j, h j -> h i j', 
                                                                     state[state_idx[0, j-1, -1]], 
-                                                                    torch.exp(w_orig[0, j, lengths[0, j]-1, :, :]))
+                                                                    torch.exp(w_orig[0, j*cs + lengths[0, j]-1, :, :]-
+                                                                              w_orig[0, j*cs                -1, :, :]))
 
                 if r.dtype == torch.bfloat16:
                     continous_chunk_rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
