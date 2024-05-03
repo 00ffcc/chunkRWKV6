@@ -6,7 +6,7 @@ typedef at::Half fp16;
 typedef float fp32;
 
 template <typename F>
-__global__ void kernel_forward(const int B, const int T, const int C, const int H, float *__restrict__ _state, int * __restrict__ _state_idx,
+__global__ void kernel_forward(const int B, const int T, const int C, const int H, const int CT, float *__restrict__ _state, int * __restrict__ _state_idx,
                                const F *__restrict__ const _r, const F *__restrict__ const _k, const F *__restrict__ const _v, const float *__restrict__ _w, const F *__restrict__ _u,
                                F *__restrict__ const _y)
 {
@@ -27,8 +27,8 @@ __global__ void kernel_forward(const int B, const int T, const int C, const int 
     __syncthreads();
     u[i] = float(_u[i]);
     __syncthreads();
-
-    for (int t = b*T*C + h*_N_ + i, ti = 0; t < (b+1)*T*C + h*_N_ + i; t += C, ti++)
+    int t_end = b*T*C + h*_N_ + i + ((b+1)*T <= CT ? T : CT - b*T)*C;
+    for (int t = b*T*C + h*_N_ + i, ti = 0; t < t_end; t += C, ti++)
     {
         if (_state_idx[ti] != current_state_idx)
         {
@@ -92,18 +92,18 @@ __global__ void kernel_forward(const int B, const int T, const int C, const int 
         _state[t0 + j] = state[j];
 }
 
-void cuda_forward_bf16(int B, int T, int C, int H, float *state, int *_state_idx, bf16 *r, bf16 *k, bf16 *v, float *w, bf16 *u, bf16 *y)
+void cuda_forward_bf16(int B, int T, int C, int H, int CT, float *state, int *_state_idx, bf16 *r, bf16 *k, bf16 *v, float *w, bf16 *u, bf16 *y)
 {
     assert(H*_N_ == C);
-    kernel_forward<<<dim3(B * H), dim3(_N_)>>>(B, T, C, H, state, _state_idx, r, k, v, w, u, y);
+    kernel_forward<<<dim3(B * H), dim3(_N_)>>>(B, T, C, H, CT, state, _state_idx, r, k, v, w, u, y);
 }
-void cuda_forward_fp16(int B, int T, int C, int H, float *state, int *_state_idx, fp16 *r, fp16 *k, fp16 *v, float *w, fp16 *u, fp16 *y)
+void cuda_forward_fp16(int B, int T, int C, int H, int CT, float *state, int *_state_idx, fp16 *r, fp16 *k, fp16 *v, float *w, fp16 *u, fp16 *y)
 {
     assert(H*_N_ == C);
-    kernel_forward<<<dim3(B * H), dim3(_N_)>>>(B, T, C, H, state, _state_idx, r, k, v, w, u, y);
+    kernel_forward<<<dim3(B * H), dim3(_N_)>>>(B, T, C, H, CT, state, _state_idx, r, k, v, w, u, y);
 }
-void cuda_forward_fp32(int B, int T, int C, int H, float *state, int *_state_idx, fp32 *r, fp32 *k, fp32 *v, float *w, fp32 *u, fp32 *y)
+void cuda_forward_fp32(int B, int T, int C, int H, int CT, float *state, int *_state_idx, fp32 *r, fp32 *k, fp32 *v, float *w, fp32 *u, fp32 *y)
 {
     assert(H*_N_ == C);
-    kernel_forward<<<dim3(B * H), dim3(_N_)>>>(B, T, C, H, state, _state_idx, r, k, v, w, u, y);
+    kernel_forward<<<dim3(B * H), dim3(_N_)>>>(B, T, C, H, CT, state, _state_idx, r, k, v, w, u, y);
 }

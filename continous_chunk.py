@@ -2,6 +2,7 @@ import os
 import torch
 from torch.utils.cpp_extension import load
 from einops import rearrange, reduce, repeat
+import math
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 HEAD_SIZE=64 # 每个head的大小
@@ -24,12 +25,16 @@ class continousChunkRWKV6(torch.autograd.Function):
             assert B == 1, "batch_size must be 1 for continous_chunk_rwkv6"
             assert state.dtype == torch.float32
             assert w.dtype == torch.float32
-            assert T % chunk_size == 0, "T must be divisible by chunk_size"
             assert C == H*HEAD_SIZE, "C must be equal to H*HEAD_SIZE"
-            nc=T//chunk_size # num_chunks
-            cs=chunk_size # chunk_size
+
+            nc = math.ceil(T/chunk_size) # num_chunks
+            cs = chunk_size # chunk_size
 
             cnt = seq_idx[0, -1].item() + 1 # 总的state的个数 [0,cnt)
+
+            if nc*cs > T: # fill seq_idx with -1 if T is not divisible by chunk_size
+                seq_idx = torch.cat([seq_idx, torch.full((B, nc*cs-T), -1, device=seq_idx.device, dtype=torch.int32)], dim=1)
+
             end_state_idx = torch.tensor([i for i in range(cnt)], dtype=torch.int32, device=state.device)
 
             seq_idx = rearrange(seq_idx, 'b (nc cs) -> b nc cs', nc=nc, cs=cs)
@@ -57,16 +62,17 @@ class continousChunkRWKV6(torch.autograd.Function):
             assert u.is_contiguous()
             assert state.is_contiguous()
 
-            # print("shape", state_idx.shape, state.shape, w_orig.shape)
+            # print("state", state_idx)
 
             # 块内计算
-            y = torch.empty((B, nc, cs, H, HEAD_SIZE), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
+            # y = torch.empty((B, nc, cs, H, HEAD_SIZE), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
+            y = torch.empty((B, T, C), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
             if r.dtype == torch.bfloat16:
-                continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, state, state_idx, r, k, v, w, u, y)
+                continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
             elif r.dtype == torch.float16:
-                continous_chunk_rwkv6.forward_fp16(B*nc, cs, C, H, state, state_idx, r, k, v, w, u, y)
+                continous_chunk_rwkv6.forward_fp16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
             elif r.dtype == torch.float32:
-                continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, state, state_idx, r, k, v, w, u, y)
+                continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
 
             # 计算块间的贡献
 
@@ -89,13 +95,12 @@ class continousChunkRWKV6(torch.autograd.Function):
             
             state = state[end_state_idx, :, :, :]
 
-            # 输出
-            y = rearrange(y, 'b nc cs h hs -> b (nc cs) (h hs)')
+
             return y, state
 
             
 if __name__ == '__main__':
-    B, T, H = 1, 64, 1
+    B, T, H = 1, 30, 1
     C = H*HEAD_SIZE
     state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
     r = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
