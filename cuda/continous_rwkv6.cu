@@ -33,7 +33,6 @@ __global__ void kernel_forward(const int B, const int T, const int C, const int 
         if (_state_idx[ti] != current_state_idx)
         {
             // store
-            
             if(current_state_idx != -1)
             {
                 int t0 = current_state_idx*H*_N_*_N_ + h*_N_*_N_ + i*_N_;

@@ -41,9 +41,9 @@ $X_{t,h,i,j}=V_{t,h,i}K_{t,h,j}$
 
 $S_{t,h,i,j}=S_{t-1,h,i,j}W_{t,h,j}+X_{t,h,i,j}$
 
- $Y_{t,h,i}=\sum_{j}R_{t,h,j}(U_{t,h,j}X_{t,h,i,j}+S_{t-1,h,i,j})$
+ $Y_{t,h,i}=\sum_{j}R_{t,h,j}(U_{h,j}X_{t,h,i,j}+S_{t-1,h,i,j})$
 
-$Y_{t_1,h,i}=\sum_j R_{t_1,h,j}(U_{t_1,h,j}V_{t_1,h,i}K_{t_1,h,j}+\sum_{t_2=0}^{t_1-1}V_{t_2,h,i}K_{t_2,h,j}\prod_{t=t_2+1}^{t_1-1}W_{t,h,j}+S_{-1,h,i,j}\prod_{t=0}^{t_1-1}W_{t,h,j})$
+$Y_{t_1,h,i}=\sum_j R_{t_1,h,j}(U_{h,j}V_{t_1,h,i}K_{t_1,h,j}+\sum_{t_2=0}^{t_1-1}V_{t_2,h,i}K_{t_2,h,j}\prod_{t=t_2+1}^{t_1-1}W_{t,h,j}+S_{-1,h,i,j}\prod_{t=0}^{t_1-1}W_{t,h,j})$
 
 
 
@@ -59,17 +59,17 @@ $\sum_{a-1}^{b-1}w_j=w_{orig,b}-w_{orig,a}$
 
 backword:
 
-$\frac{\part Loss}{\part R_{t,h,j}}=\sum_i\frac{\part Loss}{\part Y_{t,h,i}}(U_{t,h,j}X_{t,h,i,j}+S_{t-1,h,i,j})$
+$\frac{\part Loss}{\part R_{t,h,j}}=\sum_i\frac{\part Loss}{\part Y_{t,h,i}}(U_{h,j}X_{t,h,i,j}+S_{t-1,h,i,j})$
 
-$\frac{\part Loss}{\part U_{t,h,j}}=\sum_i \frac{\part Loss}{\part Y_{t,h,i}}R_{t,h,j}X_{t,h,i,j}$
+$\frac{\part Loss}{\part U_{h,j}}=\sum_t\sum_i \frac{\part Loss}{\part Y_{t,h,i}}R_{t,h,j}X_{t,h,i,j}$
 
-$\frac{\part Loss}{\part V_{t_1,h,i}}=\frac{\part Loss}{\part Y_{t_1,h,i}}\sum_{j}U_{t_1,h,j}R_{t_1,h,j}K_{t_1,h,j}+\sum_{t_2=t_1+1}\frac{\part Loss}{\part Y_{t_2,h,i}}\sum_{j}R_{t_2,h,j}K_{t_1,h,j}(\prod_{t_3=t_1+1}^{t_2-1}W_{t_3,h,j})$
+$\frac{\part Loss}{\part V_{t_1,h,i}}=\frac{\part Loss}{\part Y_{t_1,h,i}}\sum_{j}U_{h,j}R_{t_1,h,j}K_{t_1,h,j}+\sum_{t_2=t_1+1}\frac{\part Loss}{\part Y_{t_2,h,i}}\sum_{j}R_{t_2,h,j}K_{t_1,h,j}(\prod_{t_3=t_1+1}^{t_2-1}W_{t_3,h,j})$
 
-$=\frac{\part Loss}{\part Y_{t_1,h,i}}\sum_{j}U_{t_1,h,j}R_{t_1,h,j}K_{t_1,h,j}+\sum_{j}K_{t_1,h,j}\sum_{t_2=t_1+1}\frac{\part Loss}{\part Y_{t_2,h,i}}R_{t_2,h,j}(\prod_{t_3=t_1+1}^{t_2-1}W_{t_3,h,j})$
+$=\frac{\part Loss}{\part Y_{t_1,h,i}}\sum_{j}U_{h,j}R_{t_1,h,j}K_{t_1,h,j}+\sum_{j}K_{t_1,h,j}\sum_{t_2=t_1+1}\frac{\part Loss}{\part Y_{t_2,h,i}}R_{t_2,h,j}(\prod_{t_3=t_1+1}^{t_2-1}W_{t_3,h,j})$
 
 令 $S_{t,h,j}=S_{t+1,h,j}W_{t,h,j}+\frac{\part Loss}{\part Y_{t,h,j}}R_{t,h,j}$
 
-$\frac{\part Loss}{\part V_{t_1,h,i}}=\sum_{j}(\frac{\part Loss}{\part Y_{t_1,h,i}}R_{t_1,h,j}U_{t_1,h,j}+S_{t+1,h,j})K_{t_1,h,j}$
+$\frac{\part Loss}{\part V_{t_1,h,i}}=\sum_{j}(\frac{\part Loss}{\part Y_{t_1,h,i}}R_{t_1,h,j}U_{h,j}+S_{t+1,h,j})K_{t_1,h,j}$
 
 $K$ 同理
 

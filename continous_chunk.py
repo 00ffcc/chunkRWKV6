@@ -62,8 +62,6 @@ class continousChunkRWKV6(torch.autograd.Function):
             assert u.is_contiguous()
             assert state.is_contiguous()
 
-            # print("state", state_idx)
-
             # 块内计算
             # y = torch.empty((B, nc, cs, H, HEAD_SIZE), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
             y = torch.empty((B, T, C), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
@@ -100,24 +98,33 @@ class continousChunkRWKV6(torch.autograd.Function):
 
             
 if __name__ == '__main__':
-    B, T, H = 1, 30, 1
+    TS = [20,40,120,35]
+    B, T, H = 1, sum(TS), 1
     C = H*HEAD_SIZE
-    state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
+    state = torch.randn(len(TS), H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
     r = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
     k = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
     v = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
     w = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    u = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
+    u = torch.randn(C, device='cuda', dtype=torch.float32)
     seq_idx = torch.zeros((B, T), device='cuda', dtype=torch.int32)
+    for i in range(len(TS)):
+        seq_idx[0, sum(TS[:i]):sum(TS[:i+1])] = i
+
+    
     state1 = state.clone()
     import chunk
-    y1 = chunk.vanillaRWKV6.apply(B, T, C, H, state1, r, k, v, w, u)
+    y1=[]
+    for i in range(len(TS)):
+        r1, k1, v1, w1, u1 = r[0, sum(TS[:i]):sum(TS[:i+1]), :], k[0, sum(TS[:i]):sum(TS[:i+1]), :], v[0, sum(TS[:i]):sum(TS[:i+1]), :], w[0, sum(TS[:i]):sum(TS[:i+1]), :], u
+        y1.append(chunk.vanillaRWKV6.apply(B, TS[i], C, H, state1[i:i+1], r1, k1, v1, w1, u1))
+    y1 = torch.cat(y1, dim=1)
 
     y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx)
 
-    print(torch.max((y1-y2).abs()))
+    print(torch.max((y1-y2).abs()).item())
     print(y1-y2)
-    print((state1-state2).abs().max())
+    print((state1-state2).abs().max().item())
 
 
 
