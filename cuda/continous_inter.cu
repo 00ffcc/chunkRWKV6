@@ -7,7 +7,7 @@ typedef float fp32;
 
 template <typename F>
 __global__ void inter_fwd_kernel(const int B, const int T, const int C, const int H, const int CK, float *__restrict__ _state, int * __restrict__ _state_idx, int * __restrict__ _length, 
-                               const F *__restrict__ const _r, const float *__restrict__ _w, F *__restrict__ const _y)
+                               const F *__restrict__ const _r, const float *__restrict__ _w, float *__restrict__ const _y)
                                // CK : chunk nums
 {
     const int b = blockIdx.x;
@@ -31,7 +31,7 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
         __syncthreads();
         r[i] = float(_r[t]);
         __syncthreads();
-        float y = float(_y[t]);
+        float y = _y[t];
         #pragma unroll
         for (int j = 0; j < _N_; j += 4)
         {
@@ -43,23 +43,23 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
             y += r_.z*w_.z*state_.z;
             y += r_.w*w_.w*state_.w;
         }
-        _y[t] = F(y);
+        _y[t] = y;
         __syncthreads();
         cw[i] *= _w[t];
         __syncthreads();
     }
 }
-void inter_fwd_bf16(int B, int T, int C, int H, int CK, float *state, int *_state_idx, int *_length, bf16 *r, float *w, bf16 *y)
+void inter_fwd_bf16(int B, int T, int C, int H, int CK, float *state, int *_state_idx, int *_length, bf16 *r, float *w, float *y)
 {
     assert(H*_N_ == C);
     inter_fwd_kernel<<<dim3(B, CK-1, H), dim3(_N_)>>>(B, T, C, H, CK, state, _state_idx, _length, r, w, y);
 }
-void inter_fwd_fp16(int B, int T, int C, int H, int CK, float *state, int *_state_idx, int *_length, fp16 *r, float *w, fp16 *y)
+void inter_fwd_fp16(int B, int T, int C, int H, int CK, float *state, int *_state_idx, int *_length, fp16 *r, float *w, float *y)
 {
     assert(H*_N_ == C);
     inter_fwd_kernel<<<dim3(B, CK-1, H), dim3(_N_)>>>(B, T, C, H, CK, state, _state_idx, _length, r, w, y);
 }
-void inter_fwd_fp32(int B, int T, int C, int H, int CK, float *state, int *_state_idx, int *_length, fp32 *r, float *w, fp32 *y)
+void inter_fwd_fp32(int B, int T, int C, int H, int CK, float *state, int *_state_idx, int *_length, fp32 *r, float *w, float *y)
 {
     assert(H*_N_ == C);
     inter_fwd_kernel<<<dim3(B, CK-1, H), dim3(_N_)>>>(B, T, C, H, CK, state, _state_idx, _length, r, w, y);

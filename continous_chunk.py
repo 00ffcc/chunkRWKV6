@@ -64,7 +64,7 @@ class continousChunkRWKV6(torch.autograd.Function):
 
             # 块内计算
             # y = torch.empty((B, nc, cs, H, HEAD_SIZE), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
-            y = torch.empty((B, T, C), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
+            y = torch.empty((B, T, C), device=w.device, dtype=torch.float32, memory_format=torch.contiguous_format) # result
             if r.dtype == torch.bfloat16:
                 continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
             elif r.dtype == torch.float16:
@@ -92,7 +92,7 @@ class continousChunkRWKV6(torch.autograd.Function):
                     continous_chunk_rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
             
             state = state[end_state_idx, :, :, :]
-
+            y = y.to(dtype=r.dtype)
 
             return y, state
 
