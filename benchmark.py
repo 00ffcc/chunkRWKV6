@@ -12,13 +12,13 @@ def benchmark(T, chunk_size):
         k = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
         v = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
         w = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
-        u = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
+        u = torch.randn(C, device=DEVICE, dtype=torch.float32)
     else:
         r = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
         k = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
         v = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
         w = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
-        u = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
+        u = torch.randn(H, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
     state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
     st=0
     num=20

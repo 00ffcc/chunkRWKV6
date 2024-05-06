@@ -60,7 +60,6 @@ class chunkRWKV6(torch.autograd.Function):
             k = rearrange(k, 'b (nc cs) c -> b nc cs c', nc=nc, cs=cs)
             v = rearrange(v, 'b (nc cs) c -> b nc cs c', nc=nc, cs=cs)
             w = rearrange(w, 'b (nc cs) c -> b nc cs c', nc=nc, cs=cs)
-            u = rearrange(u, 'b (nc cs) c -> b nc cs c', nc=nc, cs=cs)
 
 
             state = torch.stack([torch.cat([state[i:i+1], 
@@ -111,7 +110,7 @@ if __name__ == '__main__':
     k = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
     v = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
     w = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    u = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
+    u = torch.randn(C, device='cuda', dtype=torch.float32)
 
     state1 = state.clone()
     y1 = vanillaRWKV6.apply(B, T, C, H, state1, r, k, v, w, u)

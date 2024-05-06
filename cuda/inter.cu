@@ -15,6 +15,10 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
     const int h = blockIdx.z;
     const int i = threadIdx.x;
     _state+=b*CK*H*_N_*_N_ + (ck-1)*H*_N_*_N_ + h*_N_*_N_ + i*_N_; // state_(ck-1)
+    float state[_N_];
+    #pragma unroll
+    for (int j = 0; j < _N_; j++)
+        state[j] = _state[j];
     __shared__ float r[_N_], cw[_N_];
 
     __syncthreads();
@@ -32,7 +36,7 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
         {
             const float4& r_ = (float4&)(r[j]);
             const float4& w_ = (float4&)(cw[j]);
-            const float4& state_ = (float4&)(_state[j]);
+            const float4& state_ = (float4&)(state[j]);
             y += r_.x*w_.x*state_.x;
             y += r_.y*w_.y*state_.y;
             y += r_.z*w_.z*state_.z;
