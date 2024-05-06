@@ -80,21 +80,21 @@ class chunkRWKV6(torch.autograd.Function):
                 rwkv6.forward_fp16(B*nc, cs, C, H, state, r, k, v, w, u, y)
             elif r.dtype == torch.float32:
                 rwkv6.forward_fp32(B*nc, cs, C, H, state, r, k, v, w, u, y)
+            if nc > 1:
+                # 计算块间的贡献
+                r = rearrange(r, 'b nc cs (h hs) -> b nc cs h hs', h=H, hs=HEAD_SIZE)
 
-            # 计算块间的贡献
-            r = rearrange(r, 'b nc cs (h hs) -> b nc cs h hs', h=H, hs=HEAD_SIZE)
-
-            for j in range(1, nc): # TODO 优化
-                state[:, j, :, :, :] += torch.einsum('b h i j, b h j -> b h i j', 
-                                                        state[:, j-1, :, :, :], 
-                                                        torch.exp(w_orig[:, j, -1, :, :]))
-            if r.dtype == torch.bfloat16:
-                rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, r, w, y)
-            elif r.dtype == torch.float16:
-                rwkv6.Inter_fwd_fp16(B, cs, C, H, nc, state, r, w, y)
-            elif r.dtype == torch.float32:
-                rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, r, w, y)
-            
+                for j in range(1, nc): # TODO 优化
+                    state[:, j, :, :, :] += torch.einsum('b h i j, b h j -> b h i j', 
+                                                            state[:, j-1, :, :, :], 
+                                                            torch.exp(w_orig[:, j, -1, :, :]))
+                if r.dtype == torch.bfloat16:
+                    rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, r, w, y)
+                elif r.dtype == torch.float16:
+                    rwkv6.Inter_fwd_fp16(B, cs, C, H, nc, state, r, w, y)
+                elif r.dtype == torch.float32:
+                    rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, r, w, y)
+                
             state = state[:, -1, :, :, :] # 取最后一个块的状态
 
             # 输出
@@ -103,14 +103,14 @@ class chunkRWKV6(torch.autograd.Function):
 
             
 if __name__ == '__main__':
-    B, T, H = 2, 256, 6
+    B, T, H = 2, 64, 1
     C = H*HEAD_SIZE
     state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
-    r = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    k = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    v = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
+    r = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
+    k = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
+    v = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
     w = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    u = torch.randn(C, device='cuda', dtype=torch.float32)
+    u = torch.randn(C, device='cuda', dtype=torch.float16)
 
     state1 = state.clone()
     y1 = vanillaRWKV6.apply(B, T, C, H, state1, r, k, v, w, u)

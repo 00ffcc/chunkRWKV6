@@ -102,11 +102,11 @@ if __name__ == '__main__':
     B, T, H = 1, sum(TS), 1
     C = H*HEAD_SIZE
     state = torch.randn(len(TS), H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
-    r = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    k = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    v = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
+    r = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
+    k = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
+    v = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
     w = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    u = torch.randn(C, device='cuda', dtype=torch.float32)
+    u = torch.randn(C, device='cuda', dtype=torch.float16)
     seq_idx = torch.zeros((B, T), device='cuda', dtype=torch.int32)
     for i in range(len(TS)):
         seq_idx[0, sum(TS[:i]):sum(TS[:i+1])] = i

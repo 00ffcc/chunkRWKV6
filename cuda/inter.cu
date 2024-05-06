@@ -51,12 +51,12 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
 void inter_fwd_bf16(int B, int T, int C, int H, int CK, float *state, bf16 *r, float *w, bf16 *y)
 {
     assert(H*_N_ == C);
-    inter_fwd_kernel<<<dim3(B, CK, H), dim3(_N_)>>>(B, T, C, H, CK, state, r, w, y);
+    inter_fwd_kernel<<<dim3(B, CK-1, H), dim3(_N_)>>>(B, T, C, H, CK, state, r, w, y);
 }
 void inter_fwd_fp16(int B, int T, int C, int H, int CK, float *state, fp16 *r, float *w, fp16 *y)
 {
     assert(H*_N_ == C);
-    inter_fwd_kernel<<<dim3(B, CK, H), dim3(_N_)>>>(B, T, C, H, CK, state, r, w, y);
+    inter_fwd_kernel<<<dim3(B, CK-1, H), dim3(_N_)>>>(B, T, C, H, CK, state, r, w, y);
 }
 void inter_fwd_fp32(int B, int T, int C, int H, int CK, float *state, fp32 *r, float *w, fp32 *y)
 {
