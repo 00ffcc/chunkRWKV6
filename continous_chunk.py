@@ -4,27 +4,18 @@ from torch.utils.cpp_extension import load
 from einops import rearrange, reduce, repeat
 import math
 
-dir_path = os.path.dirname(os.path.abspath(__file__))
-HEAD_SIZE=64 # 每个head的大小
-if torch.version.cuda is not None:
-    continous_chunk_rwkv6 = load(name="continous_chunk_rwkv6", sources=[f"{dir_path}/cuda/continous_rwkv6_op.cpp", f"{dir_path}/cuda/continous_rwkv6.cu", f"{dir_path}/cuda/continous_inter.cu"], # cuda
-                verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3",  "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={4096}"]) 
-elif torch.version.hip is not None:
-    continous_chunk_rwkv6 = load(name="continous_chunk_rwkv6", sources=[f"{dir_path}/cuda/continous_rwkv6_op.cpp", f"{dir_path}/cuda/continous_rwkv6.cu", f"{dir_path}/cuda/continous_inter.cu"], # rocm
-                verbose=True, extra_cuda_cflags=["-O3", f"-D_N_={HEAD_SIZE}", f"-D_T_={4096}"])
-else:
-    raise NotImplementedError("Only support CUDA and ROCm")
 
 class continousChunkRWKV6(torch.autograd.Function):
     # 将所有序列拼在一起,batch_size=1
     # seq_idx: 每个位置是属于哪个序列的
     @staticmethod
-    def forward(ctx, B, T, C, H, state, r, k, v, w, u, seq_idx, chunk_size=32):
+    def forward(ctx, B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, continous_chunk_rwkv6, chunk_size=2048):
         with torch.no_grad():
             # r,k,v,w (B, T, C)
             assert B == 1, "batch_size must be 1 for continous_chunk_rwkv6"
             assert state.dtype == torch.float32
             assert w.dtype == torch.float32
+            assert u.dtype == torch.float32
             assert C == H*HEAD_SIZE, "C must be equal to H*HEAD_SIZE"
 
             nc = math.ceil(T/chunk_size) # num_chunks
@@ -73,7 +64,6 @@ class continousChunkRWKV6(torch.autograd.Function):
                 continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
 
             # 计算块间的贡献
-
             if nc > 1:
                 lengths = torch.zeros(B, nc, device=w.device, dtype=torch.int32)
                 for j in range(1, nc): # TODO 优化
@@ -92,13 +82,23 @@ class continousChunkRWKV6(torch.autograd.Function):
                     continous_chunk_rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
             
             state = state[end_state_idx, :, :, :]
-            y = y.to(dtype=r.dtype)
 
             return y, state
 
             
 if __name__ == '__main__':
-    TS = [20,40,120,35]
+    dir_path = os.path.dirname(os.path.abspath(__file__))
+    HEAD_SIZE=64 # 每个head的大小
+    if torch.version.cuda is not None:
+        continous_chunk_rwkv6 = load(name="continous_chunk_rwkv6", sources=[f"{dir_path}/cuda/continous_rwkv6_op.cpp", f"{dir_path}/cuda/continous_rwkv6.cu", f"{dir_path}/cuda/continous_inter.cu"], # cuda
+                    verbose=True, extra_cuda_cflags=["-res-usage", "--use_fast_math", "-O3",  "--extra-device-vectorization", f"-D_N_={HEAD_SIZE}", f"-D_T_={4096}"]) 
+    elif torch.version.hip is not None:
+        continous_chunk_rwkv6 = load(name="continous_chunk_rwkv6", sources=[f"{dir_path}/cuda/continous_rwkv6_op.cpp", f"{dir_path}/cuda/continous_rwkv6.cu", f"{dir_path}/cuda/continous_inter.cu"], # rocm
+                    verbose=True, extra_cuda_cflags=["-O3", f"-D_N_={HEAD_SIZE}", f"-D_T_={4096}"])
+    else:
+        raise NotImplementedError("Only support CUDA and ROCm")
+
+    TS = [20,40,120,305]
     B, T, H = 1, sum(TS), 1
     C = H*HEAD_SIZE
     state = torch.randn(len(TS), H, HEAD_SIZE, HEAD_SIZE, device='cuda', dtype=torch.float32)
@@ -120,11 +120,13 @@ if __name__ == '__main__':
         y1.append(chunk.vanillaRWKV6.apply(B, TS[i], C, H, state1[i:i+1], r1, k1, v1, w1, u1))
     y1 = torch.cat(y1, dim=1)
 
-    y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx)
+    y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, continous_chunk_rwkv6)
 
-    print(torch.max((y1-y2).abs()).item())
+    print(torch.max((y1-y2).abs()/y1.abs()).item())
+    print(torch.max((y1-y2).abs(),dim=-2))
     print(y1-y2)
     print((state1-state2).abs().max().item())
+    print(torch.max((state1-state2).abs(),dim=0))
 
 
 
