@@ -271,7 +271,6 @@ class RWKV6(nn.Module):
                 start_pos.append(0)
             elif seq_idx[0,ids] != seq_idx[0,ids-1]:
                 start_pos.append(ids)
-        print("start_pos",start_pos)
         for i,block in enumerate(self.blocks):
             x = block(x, seq_idx, start_pos, state)
             if self.config.RESCALE_LAYER>0 and (i+1)%self.config.RESCALE_LAYER==0:
@@ -319,16 +318,40 @@ class RWKV6(nn.Module):
         model.to(model.device)
         return model
 if __name__ == '__main__':
-    prompts = ['你好','hello world']
+    prompt_parts = [
+        [
+            "何为指令集调度",
+            "通过调整重排指令集的执行(顺序)，提升指令的并行性",
+            "避免非法或者模糊语义的操作，保证正确性（如相关等）",
+        ],
+        [
+            "指令集调度实现",
+            "静态调度-编译器优化（如分支）",
+            "动态调度-硬件实现（记分牌、Tomasulo）",
+        ],
+        [
+            "Superscalar: 每个时钟周期发射2条指令，1条FP指令和1条其他指令",
+            "每个时钟周期取64位; 左边为Int , 右边为FP  只有第一条指令发射了，才能发射第二条 需要更多的寄存器端口，因为如果两条指令中第一条指令是对FP的",
+            "load操作（通过整数部件完成），另一条指令为浮点操作指令，则都会有对浮点寄存器文件的操作",
+        ],
+    ]
+    prompts = []
+    for parts in prompt_parts:
+        prompt = ""
+        for part in parts:
+            prompt += part
+        prompts.append(prompt)
     from tokenizer.tokenization_rwkv_world import RWKVWorldTokenizer
     tokenizer = RWKVWorldTokenizer(vocab_file=r"D:\rwkv_input\tokenizer\rwkv_vocab_v20230424.txt")
-    input_ids, seq_idx = tokenizer.continous_encode(prompts)
+    
     model = RWKV6.from_pretrained(r"D:\rwkv_input\model\rwkv6\RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth",dtype=torch.float16)
     states = model.empty_states(B=len(prompts))
     with torch.no_grad():
-        re = model(input_ids.to(model.device), seq_idx.to(model.device), states)
+        for i in range(len(prompt_parts[0])):
+            prompt = [j[i] for j in prompt_parts]
+            input_ids, seq_idx = tokenizer.continous_encode(prompt)
+            re = model(input_ids.to(model.device), seq_idx.to(model.device), states)
     log1 = re.logits
-    print(log1.shape,input_ids.shape)
     model = None
     torch.cuda.empty_cache()
 
