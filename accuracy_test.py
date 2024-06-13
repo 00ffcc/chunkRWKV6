@@ -2,11 +2,12 @@ from chunk import chunkRWKV6,vanillaRWKV6,HEAD_SIZE
 import time
 import torch
 import matplotlib.pyplot as plt
-from fla.ops.rwkv6 import chunk_rwkv6
+from fla.ops.rwkv6 import chunk_rwkv6, fused_recurrent_rwkv6
 from einops import rearrange
+DEVICE = "cuda:0"
 B, H = 1, 32
 C = H*HEAD_SIZE
-T = 1024
+T = 64
 r = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
 k = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
 v = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
@@ -21,8 +22,18 @@ r = rearrange(r, 'b t (h c) -> b h t c', h=H)
 k = rearrange(k, 'b t (h c) -> b h t c', h=H)
 v = rearrange(v, 'b t (h c) -> b h t c', h=H)
 w = rearrange(w, 'b t (h c) -> b h t c', h=H)
-u = rearrange(u, '(h c) -> c', h=H)
+u = rearrange(u, '(h c) ->h c', h=H)
 
-y2 = chunk_rwkv6(B, T, C, H, state, r, k, v, w, u)
+# w = -torch.exp(w)
+w = torch.nn.functional.logsigmoid(w)
 
-print((y1-y2).abs().max())
+y2, state2 = chunk_rwkv6(r,k,v,w,u)
+
+y3, state3 = fused_recurrent_rwkv6(r,k,v,w,u)
+
+y2 = rearrange(y2, 'b h t c -> b t (h c)', h=H)
+y3 = rearrange(y3, 'b h t c -> b t (h c)', h=H)
+
+print((y2-y3).abs().max())
+
+# print((state1-state2).abs().max())
