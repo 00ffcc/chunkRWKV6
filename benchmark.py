@@ -1,24 +1,32 @@
 from chunk import chunkRWKV6,vanillaRWKV6,HEAD_SIZE
+from continous_chunk import continousChunkRWKV6
 import time
 import torch
 import matplotlib.pyplot as plt
 from fla.ops.rwkv6 import chunk_rwkv6
 DEVICE="cuda:0"
-def benchmark(T, chunk_size):
+def benchmark(T, chunk_size, dtype=torch.float32):
     B, H = 1, 32
     C = H*HEAD_SIZE
-    if chunk_size!=-2:
-        r = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
-        k = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
-        v = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
+    if chunk_size==-1:
+        r = torch.randn(B, T, C, device=DEVICE, dtype=dtype)
+        k = torch.randn(B, T, C, device=DEVICE, dtype=dtype)
+        v = torch.randn(B, T, C, device=DEVICE, dtype=dtype)
         w = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
         u = torch.randn(C, device=DEVICE, dtype=torch.float32)
-    else:
-        r = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
-        k = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
-        v = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
-        w = torch.randn(B,H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
+    if chunk_size==-2:
+        r = torch.randn(B, H, T, HEAD_SIZE, device=DEVICE, dtype=dtype)
+        k = torch.randn(B, H, T, HEAD_SIZE, device=DEVICE, dtype=dtype)
+        v = torch.randn(B, H, T, HEAD_SIZE, device=DEVICE, dtype=dtype)
+        w = torch.randn(B, H, T, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
         u = torch.randn(H, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
+    if chunk_size>0:
+        r = torch.randn(1, B*T, C, device=DEVICE, dtype=dtype)
+        k = torch.randn(1, B*T, C, device=DEVICE, dtype=dtype)
+        v = torch.randn(1, B*T, C, device=DEVICE, dtype=dtype)
+        w = torch.randn(1, B*T, C, device=DEVICE, dtype=torch.float32)
+        u = torch.randn(C, device=DEVICE, dtype=torch.float32)
+        seq_idx = torch.Tensor([[i]*T for i in range(B)], dtype=torch.int32).unsqueeze(0)
     state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
     st=0
     num=20
@@ -30,7 +38,7 @@ def benchmark(T, chunk_size):
         elif chunk_size==-1:
             y1 = vanillaRWKV6.apply(B, T, C, H, state, r, k, v, w, u)
         else:
-            y2, state2 = chunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, chunk_size)
+            y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, chunk_size)
         torch.cuda.synchronize()
         end = time.time()
         if i!=0:
@@ -43,7 +51,7 @@ if __name__ == '__main__':
     for chunk_size in [2048, 4096, 8192, 16384, -1,-2]:
         ti=[]
         for T in t:
-            tt=benchmark(T, chunk_size)
+            tt=benchmark(T, chunk_size, torch.float16)
             ti.append(tt)
             print(f"chunk_size={chunk_size}, T={T}, time={tt}s")
         if chunk_size == -2:

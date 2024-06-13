@@ -9,7 +9,7 @@ class continousChunkRWKV6(torch.autograd.Function):
     # 将所有序列拼在一起,batch_size=1
     # seq_idx: 每个位置是属于哪个序列的
     @staticmethod
-    def forward(ctx, B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, continous_chunk_rwkv6, chunk_size=2048):
+    def forward(ctx, B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, chunk_size=2048):
         with torch.no_grad():
             # r,k,v,w (B, T, C)
             assert B == 1, "batch_size must be 1 for continous_chunk_rwkv6"
@@ -57,11 +57,11 @@ class continousChunkRWKV6(torch.autograd.Function):
             # y = torch.empty((B, nc, cs, H, HEAD_SIZE), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
             y = torch.empty((B, T, C), device=w.device, dtype=torch.float32, memory_format=torch.contiguous_format) # result
             if r.dtype == torch.bfloat16:
-                continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
+                torch.ops.continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
             elif r.dtype == torch.float16:
-                continous_chunk_rwkv6.forward_fp16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
+                torch.ops.continous_chunk_rwkv6.forward_fp16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
             elif r.dtype == torch.float32:
-                continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
+                torch.ops.continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
 
             # 计算块间的贡献
             if nc > 1:
@@ -75,11 +75,11 @@ class continousChunkRWKV6(torch.autograd.Function):
                                                                               w_orig[0, j*cs                -1, :, :]))
 
                 if r.dtype == torch.bfloat16:
-                    continous_chunk_rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
+                    torch.ops.continous_chunk_rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
                 elif r.dtype == torch.float16:
-                    continous_chunk_rwkv6.Inter_fwd_fp16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
+                    torch.ops.continous_chunk_rwkv6.Inter_fwd_fp16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
                 elif r.dtype == torch.float32:
-                    continous_chunk_rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
+                    torch.ops.continous_chunk_rwkv6.Inter_fwd_fp32(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
             
             state = state[end_state_idx, :, :, :]
 
@@ -106,27 +106,27 @@ if __name__ == '__main__':
     k = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
     v = torch.randn(B, T, C, device='cuda', dtype=torch.float16)
     w = torch.randn(B, T, C, device='cuda', dtype=torch.float32)
-    u = torch.randn(C, device='cuda', dtype=torch.float16)
+    u = torch.randn(C, device='cuda', dtype=torch.float32)
     seq_idx = torch.zeros((B, T), device='cuda', dtype=torch.int32)
     for i in range(len(TS)):
         seq_idx[0, sum(TS[:i]):sum(TS[:i+1])] = i
 
     
-    state1 = state.clone()
-    import chunk
-    y1=[]
-    for i in range(len(TS)):
-        r1, k1, v1, w1, u1 = r[0, sum(TS[:i]):sum(TS[:i+1]), :], k[0, sum(TS[:i]):sum(TS[:i+1]), :], v[0, sum(TS[:i]):sum(TS[:i+1]), :], w[0, sum(TS[:i]):sum(TS[:i+1]), :], u
-        y1.append(chunk.vanillaRWKV6.apply(B, TS[i], C, H, state1[i:i+1], r1, k1, v1, w1, u1))
-    y1 = torch.cat(y1, dim=1)
+    # state1 = state.clone()
+    # import chunk
+    # y1=[]
+    # for i in range(len(TS)):
+    #     r1, k1, v1, w1, u1 = r[0, sum(TS[:i]):sum(TS[:i+1]), :], k[0, sum(TS[:i]):sum(TS[:i+1]), :], v[0, sum(TS[:i]):sum(TS[:i+1]), :], w[0, sum(TS[:i]):sum(TS[:i+1]), :], u
+    #     y1.append(chunk.vanillaRWKV6.apply(B, TS[i], C, H, state1[i:i+1], r1, k1, v1, w1, u1))
+    # y1 = torch.cat(y1, dim=1)
 
     y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, continous_chunk_rwkv6)
 
-    print(torch.max((y1-y2).abs()/y1.abs()).item())
-    print(torch.max((y1-y2).abs(),dim=-2))
-    print(y1-y2)
-    print((state1-state2).abs().max().item())
-    print(torch.max((state1-state2).abs(),dim=0))
+    # print(torch.max((y1-y2).abs()/y1.abs()).item())
+    # print(torch.max((y1-y2).abs(),dim=-2))
+    # print(y1-y2)
+    # print((state1-state2).abs().max().item())
+    # print(torch.max((state1-state2).abs(),dim=0))
 
 
 

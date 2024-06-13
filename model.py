@@ -118,7 +118,7 @@ class RWKV_Tmix_x060(MyModule):
         dtype = x.dtype
         r, k, v, g, w = self.jit_func(x, start_pos, state)
         layer_state = state[1][:, :, :, :,self.layer_id].contiguous()
-        x, state[1][:, :, :, :,self.layer_id] = continousChunkRWKV6.apply(B, T, C, H, layer_state,r, k, v, w, self.time_faaaa, seq_idx, HEAD_SIZE, continous_chunk_rwkv6)
+        x, state[1][:, :, :, :,self.layer_id] = continousChunkRWKV6.apply(B, T, C, H, layer_state,r, k, v, w, self.time_faaaa, seq_idx, HEAD_SIZE)
         x = x.view(B * T, C)
         x = self.ln_x(x).view(B, T, C).to(dtype)
         x = self.output(x * g)
