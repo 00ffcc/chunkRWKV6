@@ -30,6 +30,7 @@ __global__ void kernel_forward(const int B, const int T, const int C, const int 
     int t_end = b*T*C + h*_N_ + i + ((b+1)*T <= CT ? T : CT - b*T)*C;
     for (int t = b*T*C + h*_N_ + i, ti = 0; t < t_end; t += C, ti++)
     {
+        __syncthreads();
         if (_state_idx[ti] != current_state_idx)
         {
             // store
@@ -49,7 +50,7 @@ __global__ void kernel_forward(const int B, const int T, const int C, const int 
             for (int j = 0; j < _N_; j++)
                 state[j] = _state[t0 + j];
         }
-        __syncthreads();
+        
         w[i] = _w[t];
         r[i] = float(_r[t]);
         k[i] = float(_k[t]);

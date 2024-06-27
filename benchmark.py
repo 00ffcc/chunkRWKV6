@@ -16,7 +16,7 @@ def benchmark(T, chunk_size, dtype=torch.float32):
         k = torch.randn(B, T, C, device=DEVICE, dtype=dtype)
         v = torch.randn(B, T, C, device=DEVICE, dtype=dtype)
         w = torch.randn(B, T, C, device=DEVICE, dtype=torch.float32)
-        u = torch.randn(C, device=DEVICE, dtype=torch.float16)
+        u = torch.randn(C, device=DEVICE, dtype=torch.float32)
     if chunk_size==-2:
         r = torch.randn(B, H, T, HEAD_SIZE, device=DEVICE, dtype=dtype)
         k = torch.randn(B, H, T, HEAD_SIZE, device=DEVICE, dtype=dtype)
@@ -28,7 +28,7 @@ def benchmark(T, chunk_size, dtype=torch.float32):
         k = torch.randn(1, B*T, C, device=DEVICE, dtype=dtype)
         v = torch.randn(1, B*T, C, device=DEVICE, dtype=dtype)
         w = torch.randn(1, B*T, C, device=DEVICE, dtype=torch.float32)
-        u = torch.randn(C, device=DEVICE, dtype=torch.float16) # 记得改
+        u = torch.randn(C, device=DEVICE, dtype=torch.float32)
         seq_idx = torch.tensor([[i]*T for i in range(B)], device=DEVICE, dtype=torch.int32)
         seq_idx = rearrange(seq_idx, "B T -> 1 (B T)")
     state = torch.zeros(B, H, HEAD_SIZE, HEAD_SIZE, device=DEVICE, dtype=torch.float32)
@@ -42,8 +42,8 @@ def benchmark(T, chunk_size, dtype=torch.float32):
         elif chunk_size==-1:
             y1 = vanillaRWKV6.apply(B, T, C, H, state, r, k, v, w, u)
         else:
-            # y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, chunk_size)
-            y2, state2 = chunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, chunk_size) # TODO: ?为什么continous这么慢
+            y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, chunk_size)
+            # y2, state2 = chunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, chunk_size) # TODO: ?为什么continous这么慢
         torch.cuda.synchronize()
         end = time.time()
         if i!=0:

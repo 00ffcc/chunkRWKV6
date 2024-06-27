@@ -40,9 +40,9 @@ class continousChunkRWKV6(torch.autograd.Function):
                 state = torch.cat([state, torch.zeros((cnt-state.shape[0], H, HEAD_SIZE, HEAD_SIZE), device=state.device, dtype=state.dtype)], dim=0).contiguous() # (cnt, H, HEAD_SIZE, HEAD_SIZE)
 
             w = -torch.exp(w)
-            w_orig = w.clone()
-            w_orig = rearrange(w_orig, 'b t (h hs) -> b t h hs', h=H, hs=HEAD_SIZE)
-            w_orig = w_orig.cumsum(dim=1)
+            w_orig = torch.cat([w, torch.zeros((B, nc*cs-T, C), device=w.device, dtype=w.dtype)], dim=1).contiguous()
+            w_orig = rearrange(w_orig, 'b (nc cs) (h hs) -> b nc cs h hs', nc=nc, cs=cs, h=H, hs=HEAD_SIZE)
+            w_orig.cumsum_(dim=2) # TODO:优化
 
             w = torch.exp(w) # time_decay TODO 优化
 
@@ -71,8 +71,7 @@ class continousChunkRWKV6(torch.autograd.Function):
                         lengths[0, j] = torch.sum(seq_idx[0, j, :]==seq_idx[0, j-1, -1], dtype=torch.int32).item()
                         state[state_idx[0, j, 0]] += torch.einsum('h i j, h j -> h i j', 
                                                                     state[state_idx[0, j-1, -1]], 
-                                                                    torch.exp(w_orig[0, j*cs + lengths[0, j]-1, :, :]-
-                                                                              w_orig[0, j*cs                -1, :, :]))
+                                                                    torch.exp(w_orig[0, j, lengths[0, j]-1, :, :]))
 
                 if r.dtype == torch.bfloat16:
                     torch.ops.continous_chunk_rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
@@ -112,18 +111,18 @@ if __name__ == '__main__':
         seq_idx[0, sum(TS[:i]):sum(TS[:i+1])] = i
 
     
-    # state1 = state.clone()
-    # import chunk
-    # y1=[]
-    # for i in range(len(TS)):
-    #     r1, k1, v1, w1, u1 = r[0, sum(TS[:i]):sum(TS[:i+1]), :], k[0, sum(TS[:i]):sum(TS[:i+1]), :], v[0, sum(TS[:i]):sum(TS[:i+1]), :], w[0, sum(TS[:i]):sum(TS[:i+1]), :], u
-    #     y1.append(chunk.vanillaRWKV6.apply(B, TS[i], C, H, state1[i:i+1], r1, k1, v1, w1, u1))
-    # y1 = torch.cat(y1, dim=1)
+    state1 = state.clone()
+    import chunk
+    y1=[]
+    for i in range(len(TS)):
+        r1, k1, v1, w1, u1 = r[0, sum(TS[:i]):sum(TS[:i+1]), :], k[0, sum(TS[:i]):sum(TS[:i+1]), :], v[0, sum(TS[:i]):sum(TS[:i+1]), :], w[0, sum(TS[:i]):sum(TS[:i+1]), :], u
+        y1.append(chunk.vanillaRWKV6.apply(B, TS[i], C, H, state1[i:i+1], r1, k1, v1, w1, u1))
+    y1 = torch.cat(y1, dim=1)
 
-    y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, continous_chunk_rwkv6)
+    y2, state2 = continousChunkRWKV6.apply(B, T, C, H, state, r, k, v, w, u, seq_idx, HEAD_SIZE, 32)
 
-    # print(torch.max((y1-y2).abs()/y1.abs()).item())
-    # print(torch.max((y1-y2).abs(),dim=-2))
+    print(torch.max((y1-y2).abs()).item())
+    print(torch.max((y1-y2).abs(),dim=-1))
     # print(y1-y2)
     # print((state1-state2).abs().max().item())
     # print(torch.max((state1-state2).abs(),dim=0))
