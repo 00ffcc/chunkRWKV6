@@ -45,7 +45,7 @@ __global__ void inter_fwd_kernel(const int B, const int T, const int C, const in
         }
         _y[t] = y;
         __syncthreads();
-        cw[i] *= _w[t];
+        cw[i] *= exp(-exp(_w[t]));
         __syncthreads();
     }
 }

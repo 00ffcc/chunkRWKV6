@@ -5,21 +5,21 @@ typedef at::BFloat16 bf16;
 typedef at::Half fp16;
 typedef float fp32;
 
-void cuda_forward_bf16(int B, int T, int C, int H, int CT, float *state, int *_state_idx, bf16 *r, bf16 *k, bf16 *v, float *w, float *u, float *y);
-void cuda_forward_fp16(int B, int T, int C, int H, int CT, float *state, int *_state_idx, fp16 *r, fp16 *k, fp16 *v, float *w, float *u, float *y);
-void cuda_forward_fp32(int B, int T, int C, int H, int CT, float *state, int *_state_idx, fp32 *r, fp32 *k, fp32 *v, float *w, float *u, float *y);
+void cuda_forward_bf16(int B, int T, int C, int H, int CT, float *state, int *_state_idx, bf16 *r, bf16 *k, bf16 *v, float *w, float *w_orig, float *u, float *y);
+void cuda_forward_fp16(int B, int T, int C, int H, int CT, float *state, int *_state_idx, fp16 *r, fp16 *k, fp16 *v, float *w, float *w_orig, float *u, float *y);
+void cuda_forward_fp32(int B, int T, int C, int H, int CT, float *state, int *_state_idx, fp32 *r, fp32 *k, fp32 *v, float *w, float *w_orig, float *u, float *y);
 
-void forward_bf16(int64_t B, int64_t T, int64_t C, int64_t H, int64_t CT, torch::Tensor &state, torch::Tensor &state_idx, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &u, torch::Tensor &y) {
+void forward_bf16(int64_t B, int64_t T, int64_t C, int64_t H, int64_t CT, torch::Tensor &state, torch::Tensor &state_idx, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &w_orig, torch::Tensor &u, torch::Tensor &y) {
     const at::cuda::OptionalCUDAGuard device_guard(device_of(state));
-    cuda_forward_bf16(B, T, C, H, CT, state.data_ptr<float>(), state_idx.data_ptr<int>(), r.data_ptr<bf16>(), k.data_ptr<bf16>(), v.data_ptr<bf16>(), w.data_ptr<float>(), u.data_ptr<float>(), y.data_ptr<float>());
+    cuda_forward_bf16(B, T, C, H, CT, state.data_ptr<float>(), state_idx.data_ptr<int>(), r.data_ptr<bf16>(), k.data_ptr<bf16>(), v.data_ptr<bf16>(), w.data_ptr<float>(), w_orig.data_ptr<float>(), u.data_ptr<float>(), y.data_ptr<float>());
 }
-void forward_fp16(int64_t B, int64_t T, int64_t C, int64_t H, int64_t CT, torch::Tensor &state, torch::Tensor &state_idx, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &u, torch::Tensor &y) {
+void forward_fp16(int64_t B, int64_t T, int64_t C, int64_t H, int64_t CT, torch::Tensor &state, torch::Tensor &state_idx, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &w_orig, torch::Tensor &u, torch::Tensor &y) {
     const at::cuda::OptionalCUDAGuard device_guard(device_of(state));
-    cuda_forward_fp16(B, T, C, H, CT, state.data_ptr<float>(), state_idx.data_ptr<int>(), r.data_ptr<fp16>(), k.data_ptr<fp16>(), v.data_ptr<fp16>(), w.data_ptr<float>(), u.data_ptr<float>(), y.data_ptr<float>());
+    cuda_forward_fp16(B, T, C, H, CT, state.data_ptr<float>(), state_idx.data_ptr<int>(), r.data_ptr<fp16>(), k.data_ptr<fp16>(), v.data_ptr<fp16>(), w.data_ptr<float>(), w_orig.data_ptr<float>(), u.data_ptr<float>(), y.data_ptr<float>());
 }
-void forward_fp32(int64_t B, int64_t T, int64_t C, int64_t H, int64_t CT, torch::Tensor &state, torch::Tensor &state_idx, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &u, torch::Tensor &y) {
+void forward_fp32(int64_t B, int64_t T, int64_t C, int64_t H, int64_t CT, torch::Tensor &state, torch::Tensor &state_idx, torch::Tensor &r, torch::Tensor &k, torch::Tensor &v, torch::Tensor &w, torch::Tensor &w_orig, torch::Tensor &u, torch::Tensor &y) {
     const at::cuda::OptionalCUDAGuard device_guard(device_of(state));
-    cuda_forward_fp32(B, T, C, H, CT, state.data_ptr<float>(), state_idx.data_ptr<int>(), r.data_ptr<fp32>(), k.data_ptr<fp32>(), v.data_ptr<fp32>(), w.data_ptr<float>(), u.data_ptr<float>(), y.data_ptr<float>());
+    cuda_forward_fp32(B, T, C, H, CT, state.data_ptr<float>(), state_idx.data_ptr<int>(), r.data_ptr<fp32>(), k.data_ptr<fp32>(), v.data_ptr<fp32>(), w.data_ptr<float>(), w_orig.data_ptr<float>(), u.data_ptr<float>(), y.data_ptr<float>());
 }
 
 

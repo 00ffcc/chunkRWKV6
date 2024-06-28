@@ -39,13 +39,7 @@ class continousChunkRWKV6(torch.autograd.Function):
             if cnt-state.shape[0] > 0:
                 state = torch.cat([state, torch.zeros((cnt-state.shape[0], H, HEAD_SIZE, HEAD_SIZE), device=state.device, dtype=state.dtype)], dim=0).contiguous() # (cnt, H, HEAD_SIZE, HEAD_SIZE)
             lengths = torch.sum(seq_idx[0, :, :]==seq_idx[0, :, 0].unsqueeze(1), dim=1,dtype=torch.int32)
-            w = -torch.exp(w)
-            w_orig = torch.cat([w, torch.zeros((B, nc*cs-T, C), device=w.device, dtype=w.dtype)], dim=1).contiguous()
-            w_orig = rearrange(w_orig, 'b (nc cs) (h hs) -> b nc cs h hs', nc=nc, cs=cs, h=H, hs=HEAD_SIZE)
-            w_orig.cumsum_(dim=2) # TODO:优化
-
-            w = torch.exp(w) # time_decay TODO 优化
-
+            w_orig = torch.zeros((nc, H, HEAD_SIZE), device=w.device, dtype=torch.float32)
             assert r.is_contiguous()
             assert k.is_contiguous()
             assert v.is_contiguous()
@@ -57,19 +51,18 @@ class continousChunkRWKV6(torch.autograd.Function):
             # y = torch.empty((B, nc, cs, H, HEAD_SIZE), device=w.device, dtype=r.dtype, memory_format=torch.contiguous_format) # result
             y = torch.empty((B, T, C), device=w.device, dtype=torch.float32, memory_format=torch.contiguous_format) # result
             if r.dtype == torch.bfloat16:
-                torch.ops.continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
+                torch.ops.continous_chunk_rwkv6.forward_bf16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, w_orig, u, y)
             elif r.dtype == torch.float16:
-                torch.ops.continous_chunk_rwkv6.forward_fp16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
+                torch.ops.continous_chunk_rwkv6.forward_fp16(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, w_orig, u, y)
             elif r.dtype == torch.float32:
-                torch.ops.continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, u, y)
-
+                torch.ops.continous_chunk_rwkv6.forward_fp32(B*nc, cs, C, H, T, state, state_idx, r, k, v, w, w_orig, u, y)
             # 计算块间的贡献
             if nc > 1:
                 for j in range(1, nc): # TODO 优化
                     if seq_idx[0, j, 0] == seq_idx[0, j-1, -1]:
                         state[state_idx[0, j, 0]] += torch.einsum('h i j, h j -> h i j', 
                                                                     state[state_idx[0, j-1, -1]], 
-                                                                    torch.exp(w_orig[0, j, lengths[j]-1, :, :]))
+                                                                    w_orig[j])
 
                 if r.dtype == torch.bfloat16:
                     torch.ops.continous_chunk_rwkv6.Inter_fwd_bf16(B, cs, C, H, nc, state, state_idx, lengths, r, w, y)
