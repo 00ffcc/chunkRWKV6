@@ -1,13 +1,18 @@
 # chunk_RWKV6
 
-使用分块并行优化RWKV的prefill和训练速度
+使用分块并行优化RWKV的prefill和训练速度, 并支持continous batching.
+
+相比官方的cuda kernel最高提速5倍, 相比fla最高提速3倍.
 
 # benchmark
+在3090上测试，batch_size=1, head_num=32, head_size=64, channel=2048, 与RWKV6-1.6b设置相同.
 
-![](img/1.png)
+由于[flash-linear-attention(fla)](https://github.com/sustcsonglin/flash-linear-attention/tree/main)使用了tensor core, chunk_RWKV6在 `fp32`(tensor core不支持)的情况下远快于fla, 在 `fp16&bf16` 且有tensor core的情况下速度相近.
+![](img/fp32.png)
+<h5 align="center">图1: fp32</h5>
 
-在3090上测试，batch_size=1, head_num=32, head_size=64, channel=2048, 与RWKV6-1.6b设置相同
-
+![](img/fp16.png)
+<h5 align="center">图2: fp16</h5>
 
 
 # Todolist
@@ -18,8 +23,6 @@
 - 支持continous batching的后端推理引擎 （正在做）
 
 # 参考
-
-
 
 [flash-linear-attention](https://github.com/sustcsonglin/flash-linear-attention/tree/main)
 

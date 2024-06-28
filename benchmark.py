@@ -66,7 +66,7 @@ if __name__ == '__main__':
     for chunk_size in [2048, 4096, 8192, 16384, -1,-2]:
         ti=[]
         for T in t:
-            tt=benchmark(T, chunk_size, torch.float16)
+            tt=benchmark(T, chunk_size, torch.bfloat16)
             ti.append(tt)
             print(f"chunk_size={chunk_size}, T={T}, time={tt}s")
         if chunk_size == -2:
